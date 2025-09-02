@@ -69,46 +69,84 @@ function setupEventListeners() {
 }
 
 // Render the course list
-function renderCourseList(filteredCourses = null) {
+function renderCourseList() {
     const courseList = document.getElementById('courseList');
-    let courses = filteredCourses || coursesData;
+    
+    // Get a copy of the course data
+    let coursesToDisplay = [...coursesData];
+    
     // Sort by courseName (case-insensitive)
-    courses = [...courses].sort((a, b) => {
+    coursesToDisplay.sort((a, b) => {
         const nameA = (a.courseName || '').toLowerCase();
         const nameB = (b.courseName || '').toLowerCase();
         return nameA.localeCompare(nameB);
     });
+    
     // Filter by input if present
     const filterInput = document.getElementById('courseFilterInput');
     const filterValue = filterInput ? filterInput.value.trim().toLowerCase() : '';
     if (filterValue) {
-        courses = courses.filter(course => (course.courseName || '').toLowerCase().includes(filterValue));
+        coursesToDisplay = coursesToDisplay.filter(course => 
+            (course.courseName || '').toLowerCase().includes(filterValue)
+        );
     }
-    if (courses.length === 0) {
+    
+    // Show message if no courses to display
+    if (coursesToDisplay.length === 0) {
         courseList.innerHTML = '<div class="no-courses">No courses found</div>';
         return;
     }
-    courseList.innerHTML = courses.map(course => `
-        <div class="course-item" data-course-name="${escapeHtml(course.courseName || '')}" onclick="selectCourse('${escapeHtml(course.courseName || '')}')">
-            <h3 class="course-title">${escapeHtml(course.courseName || 'Untitled Course')}</h3>
-        </div>
-    `).join('');
+    
+    // Create the HTML for the course list
+    courseList.innerHTML = coursesToDisplay.map((course, displayIndex) => {
+        // Find the original index in the coursesData array
+        const originalIndex = coursesData.findIndex(c => 
+            c.__kptID === course.__kptID || c.internalId === course.internalId
+        );
+        
+        const courseId = course.__kptID || course.internalId || `course-${originalIndex}`;
+        
+        return `
+            <div class="course-item" id="course-${courseId}" data-index="${originalIndex}" onclick="selectCourse(${originalIndex})">
+                <h3 class="course-title">${escapeHtml(course.courseName || 'Untitled Course')}</h3>
+            </div>
+        `;
+    }).join('');
 }
 
-// Select a course
-window.selectCourse = function(courseName) {
-    const course = coursesData.find(c => c.courseName === courseName);
-    if (!course) return;
+// Select a course by index
+window.selectCourse = function(index) {
+    // Get course from array by index
+    const course = coursesData[index];
+    if (!course) {
+        console.error('Course not found at index:', index);
+        return;
+    }
+    
     selectedCourse = course;
+    
+    // Clear previous selection
     document.querySelectorAll('.course-item').forEach(item => {
         item.classList.remove('selected');
     });
-    document.querySelector(`[data-course-name="${escapeHtml(courseName)}"]`).classList.add('selected');
+    
+    // Update UI to show selected course
+    const courseElement = document.querySelector(`[data-index="${index}"]`);
+    if (courseElement) {
+        courseElement.classList.add('selected');
+    } else {
+        console.error('Course element not found in DOM for index:', index);
+        return;
+    }
+    
+    // Show selection info
     const selectedInfo = document.getElementById('selectedCourseInfo');
     const selectedDetails = document.getElementById('selectedCourseDetails');
-    selectedDetails.innerHTML = `<div class="selected-details"><h3>${escapeHtml(course.courseName)}</h3></div>`;
-    selectedInfo.style.display = 'block';
-    selectedInfo.scrollIntoView({ behavior: 'smooth' });
+    if (selectedInfo && selectedDetails) {
+        selectedDetails.innerHTML = `<div class="selected-details"><h3>${escapeHtml(course.courseName)}</h3></div>`;
+        selectedInfo.style.display = 'block';
+        selectedInfo.scrollIntoView({ behavior: 'smooth' });
+    }
 };
 
 // Filter courses
